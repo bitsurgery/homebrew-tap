@@ -42,17 +42,19 @@ class Swoosh < Formula
     end
   end
 
-  # Install all three binaries flat into bin/ as siblings. CRITICAL: the proxy
-  # locates the two musl payloads via `current_exe().parent()`, so they MUST
-  # sit next to the swoosh binary in the same directory. Do NOT split into
-  # libexec + symlink — that would break payload resolution on macOS (current_exe
-  # dereferences the symlink to the real binary in the Cellar).
   def install
-    # The tarball extracts to `swoosh-{version}-{triple}/`; install its three
-    # binaries into bin/.
-    bin.install Dir["swoosh-*/swoosh"]
-    bin.install Dir["swoosh-*/swoosh-host-shim-linux-*"]
-    bin.install Dir["swoosh-*/swoosh-relay-linux-*"]
+    # The tarball extracts to a single top-level dir
+    # `swoosh-{version}-{triple}/` containing the three binaries as siblings.
+    # Locate that dir explicitly (don't rely on the install cwd) and install all
+    # three binaries flat into bin/ as siblings. CRITICAL: the proxy resolves the
+    # two musl payloads via current_exe().parent(), so they MUST sit next to the
+    # swoosh binary in the same directory — do NOT split into libexec + symlink.
+    pkg = Dir["swoosh-*"].find { |d| File.directory?(d) }
+    odie "Tarball did not extract a swoosh-* directory" if pkg.nil?
+
+    bin.install "#{pkg}/swoosh"
+    bin.install Dir["#{pkg}/swoosh-host-shim-linux-*"]
+    bin.install Dir["#{pkg}/swoosh-relay-linux-*"]
   end
 
   def caveats
