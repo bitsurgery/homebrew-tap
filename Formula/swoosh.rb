@@ -1,20 +1,22 @@
 # Homebrew formula for swoosh.
 #
-# ── Sibling-payload invariant ───────────────────────────────────────────────
-# swoosh is distributed as a single tarball (produced by scripts/release.sh in
-# the swoosh source tree) containing THREE binaries as siblings:
+# ── Payloads are resources, not host executables ────────────────────────────
+# The tarball (produced by scripts/release.sh in the swoosh source tree)
+# contains THREE binaries as flat siblings:
 #
 #   swoosh                              — the main TUI/agent binary (macOS native)
 #   swoosh-host-shim-linux-{arch}       — musl static binary (container-side)
 #   swoosh-relay-linux-{arch}           — musl static binary (relay/forwarder)
 #
-# The build proxy (src/sandbox/proxy.rs) resolves the two musl payloads as
-# SIBLINGS of the running swoosh binary via `current_exe().parent()`. On macOS,
-# Rust's `current_exe()` dereferences symlinks to the real binary, so the three
-# files MUST all live in the SAME directory. This formula therefore installs all
-# three flat into `bin/` and deliberately does NOT use the libexec + symlink
-# split that Homebrew commonly uses for "internal" helper binaries. See the
-# "Architecture: command execution" section of AGENTS.md.
+# Only `swoosh` is a real HOST executable (Mach-O); it goes in bin/. The two
+# musl payloads are RESOURCES: they are bind-mounted read-only into Linux
+# containers (src/sandbox/compose.rs) where the container's kernel exec's them,
+# and are NEVER exec'd on the host. They go in libexec/ — NOT bin/ — because
+# Homebrew resets non-Mach-O files in bin/ to mode 0444 and audits them as
+# "non-executables". libexec/ is not audited, so they keep the 0755 mode the
+# tarball ships (which the container needs via the :ro bind mount). The proxy
+# resolves them at <swoosh_dir>/../libexec/<name> (resolve_payload_path in
+# src/sandbox/proxy.rs). See "Architecture: command execution" in AGENTS.md.
 #
 # ── Tarball source ──────────────────────────────────────────────────────────
 # The macOS tarballs are built and published by scripts/release.sh:
@@ -47,25 +49,25 @@ class Swoosh < Formula
     # musl payloads). release.sh packages them under a `swoosh-{version}-{triple}/`
     # dir, but be robust to the exact extraction layout (a wrapper dir from the
     # upload process, or flat at the root): find the dir that actually contains
-    # the `swoosh` binary. CRITICAL: install all three flat into bin/ as siblings
-    # (no libexec split) — the proxy resolves the two musl payloads via
-    # current_exe().parent(), so they MUST sit next to the swoosh binary.
+    # the `swoosh` binary.
     pkg = ["swoosh-*", "*", "."].each do |glob|
       found = Dir[glob].find { |d| File.file?(File.join(d, "swoosh")) }
       break found if found
     end
     odie "Tarball did not extract a directory containing the swoosh binary" if pkg.nil?
 
-    # Install all three binaries flat into bin/ as siblings.
+    # The real host binary goes in bin/. The two musl payloads are RESOURCES,
+    # not host executables — they are bind-mounted read-only into Linux
+    # containers, where the container's kernel exec's them; they are never
+    # exec'd on the host. Install them into libexec/ (Homebrew's convention
+    # for internal/non-user-facing files), NOT bin/: Homebrew resets non-Mach-O
+    # files in bin/ to mode 0444 and audits them as "non-executables". libexec/
+    # is not audited, so they keep the 0755 mode the tarball ships (which the
+    # container needs). The proxy resolves them at
+    # <swoosh_dir>/../libexec/<name> (see resolve_payload_path in proxy.rs).
     bin.install "#{pkg}/swoosh"
-    bin.install Dir["#{pkg}/swoosh-host-shim-linux-*"]
-    bin.install Dir["#{pkg}/swoosh-relay-linux-*"]
-
-    # Force the executable bit on all three. The two musl payloads are Linux
-    # ELF binaries that the proxy execs INSIDE the container, so they MUST be
-    # chmod +x — and Homebrew's audit rejects non-executables in bin/. The bit
-    # can be dropped by the upload/download pipeline, so set it explicitly here.
-    chmod "+x", Dir["#{bin}/*"]
+    libexec.install Dir["#{pkg}/swoosh-host-shim-linux-*"]
+    libexec.install Dir["#{pkg}/swoosh-relay-linux-*"]
   end
 
   def caveats
