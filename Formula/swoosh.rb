@@ -2,13 +2,14 @@
 #
 # ── Payloads are resources, not host executables ────────────────────────────
 # The tarball (produced by scripts/release.sh in the swoosh source tree)
-# contains THREE binaries as flat siblings:
+# contains FOUR binaries as flat siblings:
 #
 #   swoosh                              — the main TUI/agent binary (macOS native)
 #   swoosh-host-shim-linux-{arch}       — musl static binary (container-side)
 #   swoosh-relay-linux-{arch}           — musl static binary (relay/forwarder)
+#   swoosh-mcp-shim-linux-{arch}        — musl static binary (claude-wrapper MCP)
 #
-# Only `swoosh` is a real HOST executable (Mach-O); it goes in bin/. The two
+# Only `swoosh` is a real HOST executable (Mach-O); it goes in bin/. The three
 # musl payloads are RESOURCES: they are bind-mounted read-only into Linux
 # containers (src/sandbox/compose.rs) where the container's kernel exec's them,
 # and are NEVER exec'd on the host. They go in libexec/ — NOT bin/ — because
@@ -22,7 +23,7 @@
 # The macOS tarballs are built and published by scripts/release.sh:
 #   swoosh-{version}-aarch64-apple-darwin.tar.gz   (Apple Silicon)
 #   swoosh-{version}-x86_64-apple-darwin.tar.gz    (Intel)
-# Each extracts to `swoosh-{version}-{triple}/` with the three binaries inside.
+# Each extracts to `swoosh-{version}-{triple}/` with the four binaries inside.
 # Fill in the `url`/`sha256` placeholders below once a release is published.
 
 class Swoosh < Formula
@@ -45,7 +46,7 @@ class Swoosh < Formula
   end
 
   def install
-    # The tarball contains the three binaries as siblings (swoosh + the two
+    # The tarball contains the four binaries as siblings (swoosh + the three
     # musl payloads). release.sh packages them under a `swoosh-{version}-{triple}/`
     # dir, but be robust to the exact extraction layout (a wrapper dir from the
     # upload process, or flat at the root): find the dir that actually contains
@@ -56,7 +57,7 @@ class Swoosh < Formula
     end
     odie "Tarball did not extract a directory containing the swoosh binary" if pkg.nil?
 
-    # The real host binary goes in bin/. The two musl payloads are RESOURCES,
+    # The real host binary goes in bin/. The three musl payloads are RESOURCES,
     # not host executables — they are bind-mounted read-only into Linux
     # containers, where the container's kernel exec's them; they are never
     # exec'd on the host. Install them into libexec/ (Homebrew's convention
@@ -68,6 +69,7 @@ class Swoosh < Formula
     bin.install "#{pkg}/swoosh"
     libexec.install Dir["#{pkg}/swoosh-host-shim-linux-*"]
     libexec.install Dir["#{pkg}/swoosh-relay-linux-*"]
+    libexec.install Dir["#{pkg}/swoosh-mcp-shim-linux-*"]
   end
 
   def caveats
