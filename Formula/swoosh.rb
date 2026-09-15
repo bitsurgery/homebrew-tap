@@ -35,8 +35,8 @@ class Swoosh < Formula
   on_macos do
     on_arm do
       # TODO: replace url/sha256 with the real aarch64 tarball from release.sh output.
-      url "https://github.com/bitsurgery/swoosh/releases/download/v0.2.22/swoosh-0.2.22-aarch64-apple-darwin.tar.gz"
-      sha256 "667af4297548dda3315997726e72320a7015a41858c0accf3b6a89cd20617d43"
+      url "https://github.com/bitsurgery/swoosh/releases/download/v0.2.23/swoosh-0.2.23-aarch64-apple-darwin.tar.gz"
+      sha256 "c0700fc1c3bf994f3b7eee4f33b59811e04574a6686055445c5ff56aa67c7bf7"
     end
 
     on_intel do
